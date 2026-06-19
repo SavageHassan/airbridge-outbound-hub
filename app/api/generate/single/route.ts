@@ -37,27 +37,36 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. CASUAL, NO-AI-VIBE HUMANIZED PROMPT MATRIX
+    // Determine the active data stream context (Use scraped payload or fallback to manually pasted context text)
+    const finalTargetContext = scrapedDataPayload 
+      ? JSON.stringify(scrapedDataPayload, null, 2) 
+      : (rawContent || "No target data stream or manual profile context provided.");
+
+    // 2. HOOK-FIRST COGNITIVE PROMPT MATRIX (STRIPS AI FLUFF & FORCES STEP-BY-STEP LOGGING)
     const systemPrompt = `
-      Role: You are a senior engineer and technical architect sending a quick, casual, peer-to-peer connection note on LinkedIn to another developer or tech operator.
+      Role: You are an Elite Tier-1 B2B Cold Outreach Architect and Data Analyst running an advanced terminal analysis engine.
       
-      Goal: 
-      Write exactly 1 short, ultra-casual message (around 3-4 sentences max, well under 1500 characters). Speak like a real human being who is relaxed, down-to-earth, and directly messaging a peer. Completely strip away all fake sales enthusiasm, marketing pitches, or formal corporate networking fluff.
-
+      Goal: Dissect the raw target profile context provided below, isolate the single most compelling and unique "Spike Point" (such as a recent custom post, a specific business strategy, an unorthodox career shift, or an operational problem they face), and generate a high-signal, peer-to-peer connection note.
+      
       IRONCLAD RULE - BANNED AI-VIBE WORDS:
-      Do NOT use any of the following robotic words or phrases: "blend", "truly", "inspiring", "fascinated", "impressive", "seamless", "delve", "dive deep", "testament", "adventures in tech", "journey", "valuable knowledge", "excited", "passionate", "pioneering", "more than just", "uncover", "look no further".
+      Do NOT use any of the following robotic words or phrases: "blend", "truly", "inspiring", "fascinated", "impressive", "seamless", "delve", "dive deep", "testament", "adventures in tech", "journey", "valuable knowledge", "excited", "passionate", "pioneering", "more than just", "uncover", "look no further". Do NOT use generic openings like "I noticed your profile" or "Congrats on your background".
 
-      CONTEXT & SCRAPED DATA ENRICHMENT OBJECT (RAW DATA INTAKE):
+      TARGET PROFILE PAYLOAD DATA:
       \"\"\"
-      ${JSON.stringify(scrapedDataPayload, null, 2)}
+      ${finalTargetContext}
       \"\"\"
 
-      INSTRUCTIONS FOR HUMAN TONE:
-      1. Casual Opening: Start simply with "Hey [Name]," or just "[Name] -". No over-the-top pleasantries.
-      2. Casual Background Reference: Reference a real detail from their background text object (like shifting from one domain to another, or working on frontend/AI at their specific company) but say it plainly. (e.g., "Saw you moved from chemistry over to building frontends at Calda.")
-      3. Ask an Honest Technical Question: Pose a low-key, real-world question about what they are dealing with operationally. Skip corporate jargon. (e.g., "Curious how you guys are handling infrastructure costs with all the new LLM components or token spikes?")
-      4. Low-Pressure Signoff: End with a simple invite to connect or exchange ideas over a chat. Do not sound desperate or pitch services. (e.g., "Down to connect and talk shop sometime if you're open to it.")
-      5. Strict Length Check: Keep it concise. Real people write short messages. No headers, no markdown bolding templates inside the text, and no meta labels. Output the raw text message only.
+      OUTPUT STRUCTURE COMPLIANCE:
+      You must return your complete response using the exact visual format below. Do not add markdown bold prefixes inside the pitch stream itself.
+
+      [SYSTEM LOG: COGNITIVE HOOK ANALYSIS]
+      ➔ TARGET IDENTIFIED: [Extract the prospect's actual core focus area, company, or technical title]
+      ➔ ISOLATED SPIKE POINT: [Pinpoint the exact unique thing they talked about, posted, or executed from the data stream context]
+      ➔ HOOK STRATEGY: [Explain in one short sentence why this point opens a natural peer-to-peer discussion]
+
+      ========================================================================
+      [PRECISION PEER PITCH STREAM]
+      [Draft an ultra-casual, peer-to-peer message here. Speak like a real human being who is relaxed, down-to-earth, and directly messaging an industry peer. Keep it short and direct, around 3-4 sentences max. Start directly with "Hey [Name]," or "[Name] -". Drop all formal sign-offs like "Best regards" or "Sincerely". Just state the contextual spike point hook, tie it to a real-world technical or operational question, and leave it open.]
     `;
 
     // 3. Dual-Engine Failover Stream Execution
@@ -67,6 +76,7 @@ export async function POST(req: NextRequest) {
         const tokenStream = await groq.chat.completions.create({
           model: "llama-3.3-70b-versatile",
           messages: [{ role: "system", content: systemPrompt }],
+          temperature: 0.2, // Kept low to keep analysis ultra-focused and prevent robotic hallucinations
           stream: true,
         });
 

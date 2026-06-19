@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     const { profileUrl, rawContent } = await req.json();
 
     if (!process.env.APIFY_TOKEN) {
-      return new Response(JSON.stringify({ error: "Missing APIFY_TOKEN key inside your env file." }), { status: 500 });
+      return new Response(JSON.stringify({ error: "Missing APIFY_TOKEN key inside your env file." }), { status: 500, headers: { "Content-Type": "application/json" } });
     }
 
     let scrapedDataPayload: any = null;
@@ -25,15 +25,32 @@ export async function POST(req: NextRequest) {
         const { items } = await apifyClient.dataset(run.defaultDatasetId).listItems();
         
         if (items && items.length > 0) {
-          scrapedDataPayload = items[0]; 
+          const rawItem = items[0];
+
+          // ➔ GUARDRAIL: Intercept any rate limit logs, platform tier notices, or error warnings passed back instead of a profile
+          const hasValidProfileFields = !!(rawItem.fullName || rawItem.firstName || rawItem.lastName || rawItem.name || rawItem.username);
+          const isSystemWarning = JSON.stringify(rawItem).toLowerCase().includes("limit") || 
+                                  JSON.stringify(rawItem).toLowerCase().includes("tier") || 
+                                  JSON.stringify(rawItem).toLowerCase().includes("error");
+
+          if (!hasValidProfileFields || isSystemWarning) {
+            return new Response(
+              JSON.stringify({ 
+                error: "Apify failed to parse a valid profile. It encountered an account limitation, tier exhaustion, or proxy block. Check your Apify platform console." 
+              }), 
+              { status: 422, headers: { "Content-Type": "application/json" } }
+            );
+          }
+
+          scrapedDataPayload = rawItem; 
         } else {
           return new Response(
             JSON.stringify({ error: "Apify returned an empty dataset []. Please re-verify target link profile visibility." }), 
-            { status: 500 }
+            { status: 500, headers: { "Content-Type": "application/json" } }
           );
         }
       } catch (apifyError: any) {
-        return new Response(JSON.stringify({ error: `Apify Cloud Execution Fault: ${apifyError.message}` }), { status: 500 });
+        return new Response(JSON.stringify({ error: `Apify Cloud Execution Fault: ${apifyError.message}` }), { status: 500, headers: { "Content-Type": "application/json" } });
       }
     }
 
@@ -112,13 +129,13 @@ export async function POST(req: NextRequest) {
         });
         return new Response(responseStream, { headers: { "Content-Type": "text/event-stream; charset=utf-8" } });
       } catch (geminiError: any) {
-        return new Response(JSON.stringify({ error: `Inference matrix failure: ${geminiError.message}` }), { status: 500 });
+        return new Response(JSON.stringify({ error: `Inference matrix failure: ${geminiError.message}` }), { status: 500, headers: { "Content-Type": "application/json" } });
       }
     }
 
-    return new Response(JSON.stringify({ error: "Missing configuration backend keys." }), { status: 500 });
+    return new Response(JSON.stringify({ error: "Missing configuration backend keys." }), { status: 500, headers: { "Content-Type": "application/json" } });
 
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 }
